@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit TA Assistant - Mobile Friendly</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 10px; background: #f4f4f9; color: #333; margin: 0; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; font-size: 1.5rem; }
+        
+        /* Form Grid - Mobile first (1 column) */
+        .form-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 25px; }
+        
+        /* Desktop (2 columns) */
+        @media (min-width: 768px) {
+            .form-grid { grid-template-columns: 1fr 1fr; }
+            body { padding: 20px; }
+            .container { padding: 30px; }
+        }
+
+        .form-group { display: flex; flex-direction: column; }
+        label { font-weight: 600; margin-bottom: 6px; font-size: 13px; color: #555; }
+        input { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
+        input:focus { border-color: #27ae60; outline: none; }
+        
+        .button-row { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+        @media (min-width: 600px) { .button-row { flex-direction: row; } }
+        
+        button { padding: 14px 20px; color: white; border: none; font-size: 15px; font-weight: 600; border-radius: 6px; cursor: pointer; transition: background 0.3s; }
+        .btn-generate { background: #27ae60; flex: 2; }
+        .btn-reset { background: #e74c3c; flex: 1; }
+        
+        #save-notice { color: #27ae60; font-size: 12px; text-align: right; grid-column: 1 / -1; height: 18px; }
+
+        /* Report Styles */
+        #printable-area { display: none; margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; }
+        
+        /* Table responsive wrapper */
+        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 20px; border: 1px solid #ddd; }
+        
+        table { width: 100%; border-collapse: collapse; min-width: 800px; } /* Ensures table stays readable on small screens */
+        table, th, td { border: 1px solid #000; }
+        th, td { padding: 8px; text-align: center; font-size: 11px; }
+        th { background-color: #f8f9fa; }
+        
+        .text-right { text-align: right; font-weight: bold; padding-right: 15px; font-size: 1.1rem; }
+        .breakdown-box { margin-top: 20px; padding: 15px; border: 1px dashed #666; background: #fafafa; font-size: 11px; line-height: 1.6; }
+        .signature-box { margin-top: 40px; text-align: right; padding-right: 20px; }
+
+        .action-buttons { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+        @media (min-width: 600px) { .action-buttons { flex-direction: row; justify-content: center; } }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { padding: 0; background: white; }
+            .container { box-shadow: none; max-width: 100%; width: 100%; border:none; padding:0; }
+            #printable-area { display: block !important; }
+            .table-wrapper { border: none; overflow: visible; }
+            table { min-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 class="no-print">📝 Audit/Bus TA Calculation</h2>
+    
+    <div class="form-grid no-print">
+        <div id="save-notice"></div>
+        <div class="form-group"><label>Employee Name</label><input type="text" id="empName" placeholder="Name" oninput="saveProfile()"></div>
+        <div class="form-group"><label>Designation</label><input type="text" id="designation" placeholder="Designation" oninput="saveProfile()"></div>
+        <div class="form-group"><label>Basic Pay & Scale</label><input type="text" id="basicPay" oninput="saveProfile()"></div>
+        <div class="form-group"><label>DA Rate (₹)</label><input type="number" id="daRate" value="400" oninput="saveProfile()"></div>
+        
+        <div class="form-group"><label>Trip Start Date</label><input type="date" id="startDate"></div>
+        <div class="form-group"><label>Trip Return Date</label><input type="date" id="endDate"></div>
+        
+        <div class="form-group"><label>Nature of Duty</label><input type="text" id="natureOfDuty" value="Audit"></div>
+        <div class="form-group"><label>Duty Station</label><input type="text" id="dutyStation" placeholder="E.g. GHSS Alappuzha"></div>
+        <div class="form-group"><label>Bus Distance (km)</label><input type="number" id="d2" placeholder="From Chengannur"></div>
+        
+        <div class="button-row">
+            <button class="btn-generate" onclick="generateClaim()">Generate Claim Report</button>
+            <button class="btn-reset" onclick="resetAll()">Reset All Fields</button>
+        </div>
+    </div>
+
+    <div id="printable-area">
+        <div id="pdf-content">
+            <h2 style="text-decoration: underline; text-align: center;">TRAVELLING ALLOWANCE CLAIM</h2>
+            <div style="margin-bottom: 10px;">
+                <p><strong>Name & Designation:</strong> <span id="outName"></span></p>
+                <p><strong>Basic Pay:</strong> <span id="outPay"></span></p>
+                <p><strong>Nature of Duty:</strong> <span id="outDuty"></span></p>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="10%">Date</th>
+                            <th width="22%">Journey Route</th>
+                            <th width="10%">Dep. Time</th>
+                            <th width="10%">Arr. Time</th>
+                            <th width="8%">Dist.</th>
+                            <th width="8%">Mode</th>
+                            <th width="8%">Fare</th>
+                            <th width="10%">DA / Halt</th>
+                            <th width="10%">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            
+            <div id="calculationBreakdown" class="breakdown-box"></div>
+            <p class="text-right">Grand Total: ₹<span id="outTotal"></span></p>
+            
+            <div class="signature-box">
+                <p>Signature: __________________________</p>
+                <p><strong><span id="signNameDisplay"></span></strong></p>
+            </div>
+        </div>
+        <div class="no-print action-buttons">
+            <button onclick="window.print()" style="background:#3498db; width: 200px;">🖨️ Print Form</button>
+            <button onclick="downloadPDF()" style="background:#17a2b8; width: 200px;">📄 Download PDF</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Logic remains identical to your core verified code
+window.addEventListener('DOMContentLoaded', () => {
+    ['empName', 'designation', 'basicPay', 'daRate'].forEach(id => {
+        const val = localStorage.getItem('ta_' + id);
+        if(val) document.getElementById(id).value = val;
+    });
+});
+
+function saveProfile() {
+    ['empName', 'designation', 'basicPay', 'daRate'].forEach(id => {
+        localStorage.setItem('ta_' + id, document.getElementById(id).value);
+    });
+    document.getElementById('save-notice').innerText = "✓ Profile Auto-Saved";
+    setTimeout(() => document.getElementById('save-notice').innerText = "", 2000);
+}
+
+function resetAll() {
+    if(confirm("Clear all data?")) { localStorage.clear(); location.reload(); }
+}
+
+function timeToString(dateObj) {
+    let h = dateObj.getHours();
+    let m = dateObj.getMinutes();
+    let ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    m = m < 10 ? '0' + m : m;
+    return `${h}:${m} ${ampm}`;
+}
+
+function downloadPDF() {
+    const element = document.getElementById('pdf-content');
+    const name = document.getElementById('empName').value || 'TA_Claim';
+    html2pdf().set({
+        margin: 0.5, filename: `TA_Claim_${name}.pdf`, html2canvas: { scale: 2, scrollY: 0 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    }).from(element).save();
+}
+
+function generateClaim() {
+    const daRate = parseFloat(document.getElementById('daRate').value) || 0;
+    const d2 = parseFloat(document.getElementById('d2').value) || 0;
+    const startInput = document.getElementById('startDate').value;
+    const endInput = document.getElementById('endDate').value || startInput;
+    const dutyStation = document.getElementById('dutyStation').value || "Duty Station";
+    const nature = document.getElementById('natureOfDuty').value;
+    const transit = "Chengannur Bus Stand";
+
+    if (!startInput || d2 <= 8) { alert("Invalid inputs."); return; }
+
+    const startDt = new Date(startInput);
+    const endDt = new Date(endInput);
+    const busMins = d2 * 4;
+    const autoMins = 25;
+
+    let t_arrOffice = new Date(); t_arrOffice.setHours(10, 0, 0);
+    let t_busDep = new Date(t_arrOffice.getTime() - (busMins * 60000));
+    let t_resDep = new Date(t_busDep.getTime() - (autoMins * 60000));
+
+    let t_depOffice = new Date(); t_depOffice.setHours(17, 0, 0);
+    let t_busRetArr = new Date(t_depOffice.getTime() + (busMins * 60000));
+    let t_resRetArr = new Date(t_busRetArr.getTime() + (autoMins * 60000));
+
+    const t_strResDep = timeToString(t_resDep);
+    const t_strBusDep = timeToString(t_busDep);
+    const t_strBusArr = timeToString(t_busRetArr);
+    const t_strResArr = timeToString(t_resRetArr);
+
+    let tbody = "", grandTotal = 0, breakdownHtml = "<strong>DA Calculation Logic:</strong><br>";
+
+    if (d2 > 32 && startInput !== endInput) {
+        let totalHrs = (new Date(endDt.getTime() + (17*3600000)) - new Date(startDt.getTime() + (10*3600000))) / 3600000;
+        let daCount = (totalHrs >= 12 && totalHrs <= 24) ? 1 : (totalHrs > 24 ? 1 + Math.floor((totalHrs - 24) / 6) * 0.5 : 0.5);
+        let busFare = d2 * 2.5;
+        let totalDAAmount = daCount * daRate;
+        grandTotal = (80 + busFare) * 2 + totalDAAmount;
+
+        tbody += `<tr><td>${startDt.toLocaleDateString('en-GB')}</td><td>Residence to ${transit}</td><td>${t_strResDep}</td><td>${t_strBusDep}</td><td>8km</td><td>Auto</td><td>80.00</td><td></td><td></td></tr>`;
+        tbody += `<tr><td></td><td>${transit} to ${dutyStation}</td><td>${t_strBusDep}</td><td>10:00 AM</td><td>${d2}km</td><td>Bus</td><td>${busFare.toFixed(2)}</td><td></td><td></td></tr>`;
+        tbody += `<tr style="background:#f9f9f9;"><td colspan="9"><b>HALT AT ${dutyStation.toUpperCase()}</b></td></tr>`;
+        tbody += `<tr><td>${endDt.toLocaleDateString('en-GB')}</td><td>${dutyStation} to ${transit}</td><td>05:00 PM</td><td>${t_strBusArr}</td><td>${d2}km</td><td>Bus</td><td>${busFare.toFixed(2)}</td><td></td><td></td></tr>`;
+        tbody += `<tr><td></td><td>${transit} to Residence</td><td>${t_strBusArr}</td><td>${t_strResArr}</td><td>8km</td><td>Auto</td><td>80.00</td><td>₹${totalDAAmount.toFixed(2)}</td><td><b>₹${grandTotal.toFixed(2)}</b></td></tr>`;
+        breakdownHtml += `Halt Period: ${totalHrs.toFixed(1)} hrs. DA: ${daCount} × ₹${daRate} = ₹${totalDAAmount.toFixed(2)}.`;
+    } 
+    else {
+        let curr = new Date(startDt);
+        while (curr <= endDt) {
+            let busFare = (d2 * 2.5);
+            let dailyTotal = (d2 > 32) ? (160 + busFare * 2) : (daRate / 2);
+            let remark = (d2 > 32) ? " Mileage Claimed." : " Half DA Admissible.";
+            
+            tbody += `<tr style="border-top: 1.5px solid #000;"><td>${curr.toLocaleDateString('en-GB')}</td><td>Residence to ${transit}</td><td>${t_strResDep}</td><td>${t_strBusDep}</td><td>8km</td><td>Auto</td><td>80.00</td><td></td><td></td></tr>`;
+            tbody += `<tr><td></td><td>${transit} to ${dutyStation}</td><td>${t_strBusDep}</td><td>10:00 AM</td><td>${d2}km</td><td>Bus</td><td>${busFare.toFixed(2)}</td><td></td><td></td></tr>`;
+            tbody += `<tr><td></td><td>${dutyStation} to ${transit}</td><td>05:00 PM</td><td>${t_strBusArr}</td><td>${d2}km</td><td>Bus</td><td>${busFare.toFixed(2)}</td><td></td><td></td></tr>`;
+            tbody += `<tr><td></td><td>${transit} to Residence</td><td>${t_strBusArr}</td><td>${t_strResArr}</td><td>8km</td><td>Auto</td><td>80.00</td><td>₹${dailyTotal.toFixed(2)}</td><td><b>₹${dailyTotal.toFixed(2)}</b></td></tr>`;
+            tbody += `<tr><td colspan="9" style="font-size:9px; text-align:left; color:#666; padding:2px;"><i>* ${remark}</i></td></tr>`;
+            
+            grandTotal += dailyTotal;
+            curr.setDate(curr.getDate() + 1);
+        }
+        breakdownHtml = "Daily trips calculation applied.";
+    }
+
+    document.getElementById('outName').innerText = document.getElementById('empName').value + ", " + document.getElementById('designation').value;
+    document.getElementById('outPay').innerText = document.getElementById('basicPay').value;
+    document.getElementById('outDuty').innerText = nature + " at " + dutyStation;
+    document.getElementById('tableBody').innerHTML = tbody;
+    document.getElementById('outTotal').innerText = grandTotal.toFixed(2);
+    document.getElementById('signNameDisplay').innerText = document.getElementById('empName').value;
+    document.getElementById('calculationBreakdown').innerHTML = breakdownHtml;
+    
+    document.getElementById('printable-area').style.display = 'block';
+    window.scrollTo(0, document.body.scrollHeight);
+}
+</script>
+</body>
+</html>
